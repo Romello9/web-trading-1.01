@@ -1,28 +1,40 @@
 // --- START OF FILE js/main.js ---
-// js/main.js (Entry Point)
 import { setupModalTriggers, openModal } from './ui/modalHandler.js';
 import { setupAuthListeners, loadAuthState, updateLoginStateUI } from './features/auth.js';
 import { setupWalletListeners, loadWalletState, updateWalletModalUI, updateTokenDisplayUI } from './features/wallet.js';
-import { setupContentLoader, loadContent } from './features/contentLoader.js';
+import { setupContentLoader, loadContent } from './features/contentLoader.js'; // loadContent non viene più chiamato da qui all'inizio
 import { contentLibrary } from './config/contentLibrary.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired. Initializing...");
 
+    // ** CERCA GLI ELEMENTI DOM QUI DOPO DOMContentLoaded **
+    const dynamicContentAreaElement = document.getElementById('dynamic-content-area');
+    const mainNavElement = document.getElementById('main-nav');
+
+    // Verifica se gli elementi principali sono stati trovati
+    if (!dynamicContentAreaElement || !mainNavElement) {
+        console.error("Errore critico: Elementi #dynamic-content-area o #main-nav non trovati nel DOM.");
+        document.body.innerHTML = `<p style="color: red; padding: 20px;">Errore critico: Struttura pagina non valida. Contattare supporto.</p>`;
+        return; // Interrompe l'inizializzazione
+    }
+
+    console.log("Elementi DOM principali trovati.");
+
     try {
         // 1. Load State
         const initialState = loadAuthState();
         const initialWalletState = loadWalletState();
-        console.log("State Loaded:", { auth: initialState, wallet: initialWalletState });
+        console.log("State Loaded.");
 
         // 2. Setup UI Handlers
         setupModalTriggers();
         console.log("Modal triggers set up.");
 
-        // 3. Setup Feature Listeners
+        // 3. Setup Feature Listeners - **PASSA GLI ELEMENTI DOM**
         setupAuthListeners();
         setupWalletListeners();
-        setupContentLoader(); // Setup listener per nav click e popstate
+        setupContentLoader(dynamicContentAreaElement, mainNavElement); // Passa gli elementi
         console.log("Feature listeners set up.");
 
         // 4. Setup Global Button Triggers (Toolbar)
@@ -40,43 +52,36 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. Determine Initial Content Key
         let initialContentKey = 'mentalita-trader'; // Default key
         const hash = window.location.hash.substring(1);
-        let updateHistoryState = false; // Flag per evitare replaceState non necessario
+        let updateHistoryState = false;
 
         if (hash && contentLibrary.hasOwnProperty(hash)) {
             initialContentKey = hash;
-            console.log(`Using content key from valid hash: #${initialContentKey}`);
         } else {
-             // Se l'hash non è valido o assente, impostiamo il default
-            if (hash) {
-                 console.warn(`Hash "#${hash}" invalid, using default.`);
-            } else {
-                 console.log("No hash found, using default content key.");
-            }
-            // Segna che dobbiamo aggiornare l'URL/history se siamo atterrati senza un hash valido
+            if (hash) console.warn(`Hash "#${hash}" invalid, using default.`);
+            else console.log("No hash found, using default content key.");
+            // Aggiorna la history solo se mancava un hash valido
             if (!window.history.state?.contentKey || window.history.state?.contentKey !== initialContentKey) {
-                 updateHistoryState = true;
+                updateHistoryState = true;
             }
         }
 
-        // ** NUOVA PARTE: Chiama loadContent con un piccolo ritardo **
-        console.log(`Scheduling initial content load for: ${initialContentKey}`);
-        setTimeout(() => {
-            console.log("Executing scheduled initial content load.");
-            // Aggiorna lo stato della history *prima* di caricare, se necessario
-            if (updateHistoryState) {
-                 try {
-                     history.replaceState({ contentKey: initialContentKey }, contentLibrary[initialContentKey]?.pageTitle || document.title, `#${initialContentKey}`);
-                     console.log(`History state replaced for default key: ${initialContentKey}`);
-                 } catch (e) { console.warn("History replaceState failed during initial load scheduling.", e); }
-            }
-            loadContent(initialContentKey); // Carica il contenuto iniziale
-        }, 0); // Ritardo di 0ms per spostare alla fine del ciclo eventi
+        // Aggiorna lo stato della history *prima* di caricare, se necessario
+        if (updateHistoryState) {
+            try {
+                history.replaceState({ contentKey: initialContentKey }, contentLibrary[initialContentKey]?.pageTitle || document.title, `#${initialContentKey}`);
+                console.log(`History state replaced for default key: ${initialContentKey}`);
+            } catch (e) { console.warn("History replaceState failed during initial load.", e); }
+        }
 
-        console.log("Initialization sequence complete (initial load scheduled).");
+        // ** CHIAMA loadContent INIZIALE ** - Passando gli elementi DOM
+        console.log(`Loading initial content for: ${initialContentKey}`);
+        loadContent(initialContentKey, dynamicContentAreaElement, mainNavElement);
+
+        console.log("Initialization sequence complete.");
 
     } catch (error) {
         console.error("Error during application initialization:", error);
-        document.body.innerHTML = `<p style="color: red; padding: 20px;">Errore critico durante l'inizializzazione. Controlla la console (F12).</p>`;
+        dynamicContentAreaElement.innerHTML = `<p style="color: red; padding: 20px;">Errore critico durante l'inizializzazione. Controlla la console (F12).</p>`;
     }
 });
 // --- END OF FILE js/main.js ---

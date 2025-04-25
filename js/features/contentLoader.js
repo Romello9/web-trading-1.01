@@ -3,21 +3,11 @@ import { contentLibrary } from '../config/contentLibrary.js';
 import { handleChallengeClick } from './challenges.js';
 import { hasAchievement } from './wallet.js';
 
-// Rimuoviamo le definizioni globali di dynamicContentArea e mainNav da qui
-
-// Funzione helper per creare elementi DOM sicuri
+// Funzione helper per creare elementi DOM
 function createAndAppend(parent, tag, properties = {}, textContent = null) {
     const element = document.createElement(tag);
-    Object.keys(properties).forEach(key => {
-        if (key === 'className') {
-            element.className = properties[key];
-        } else {
-            element[key] = properties[key];
-        }
-    });
-    if (textContent !== null) {
-        element.textContent = textContent;
-    }
+    Object.keys(properties).forEach(key => element[key] = properties[key]);
+    if (textContent !== null) element.textContent = textContent;
     parent.appendChild(element);
     return element;
 }
@@ -68,38 +58,33 @@ function renderContentSection(sectionData) {
     return sectionElement;
 }
 
-// Evidenzia link attivo nel nav
-function highlightActiveNavLink(activeKey) {
-    // ** Cerca #main-nav qui dentro **
-    const mainNavElement = document.getElementById('main-nav');
+// Evidenzia link attivo nel nav - **ACCETTA mainNavElement COME ARGOMENTO**
+function highlightActiveNavLink(activeKey, mainNavElement) {
     if (!mainNavElement) {
-        console.warn("Elemento #main-nav non trovato per highlight.");
-        return; // Esce se non trova il nav
+        console.warn("highlightActiveNavLink: mainNavElement non fornito.");
+        return;
     }
-    mainNavElement.querySelectorAll('ul li a').forEach(link => {
-        link.classList.remove('active');
-        if (activeKey && link.dataset.contentKey === activeKey) {
-            link.classList.add('active');
-        }
-    });
+    try {
+        mainNavElement.querySelectorAll('ul li a').forEach(link => {
+            link.classList.remove('active');
+            if (activeKey && link.dataset.contentKey === activeKey) {
+                link.classList.add('active');
+            }
+        });
+    } catch (e) {
+        console.error("Errore in highlightActiveNavLink:", e, "Elemento ricevuto:", mainNavElement);
+    }
 }
 
-// Carica e renderizza il contenuto
-export function loadContent(contentKey) {
-    // ** Cerca #dynamic-content-area qui dentro **
-    const dynamicContentAreaElement = document.getElementById('dynamic-content-area');
+// Carica e renderizza il contenuto - **ACCETTA dynamicContentAreaElement e mainNavElement COME ARGOMENTI**
+export function loadContent(contentKey, dynamicContentAreaElement, mainNavElement) {
     if (!dynamicContentAreaElement) {
-        console.error("Elemento #dynamic-content-area non trovato!");
+        console.error("loadContent: dynamicContentAreaElement non fornito!");
         return;
     }
 
-    // Mostra spinner
-    dynamicContentAreaElement.innerHTML = `<div class="loading-placeholder" style="text-align: center; padding: 5rem 0;">
-           <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--secondary-color);"></i>
-           <p style="margin-top: 1rem; color: var(--grey-text);">Caricamento contenuti...</p>
-       </div>`;
+    dynamicContentAreaElement.innerHTML = `<div class="loading-placeholder"><i class="fas fa-spinner fa-spin fa-3x"></i><p>Caricamento...</p></div>`;
 
-    // Ritardo per visibilità spinner (opzionale)
     setTimeout(() => {
         try {
             const contentData = contentLibrary[contentKey];
@@ -118,7 +103,7 @@ export function loadContent(contentKey) {
                 }
             });
 
-            highlightActiveNavLink(contentKey); // Chiama la funzione che ora cerca il nav da sola
+            highlightActiveNavLink(contentKey, mainNavElement); // Passa mainNavElement
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             if (window.history.state?.contentKey !== contentKey) {
@@ -126,20 +111,18 @@ export function loadContent(contentKey) {
             }
         } catch (error) {
             console.error(`Errore caricamento/render "${contentKey}":`, error);
-            dynamicContentAreaElement.innerHTML = `<p style="color: var(--danger-color); text-align: center; padding: 3rem 0;">Errore: ${error.message}. Controlla console (F12).</p>`;
+            dynamicContentAreaElement.innerHTML = `<p style="color: red; text-align: center;">Errore: ${error.message}. Controlla console (F12).</p>`;
             document.title = 'Trading Mindset Platform - Errore';
-            highlightActiveNavLink(contentKey);
+            highlightActiveNavLink(contentKey, mainNavElement); // Passa mainNavElement anche in caso di errore
         }
     }, 50);
 }
 
-// Setup listeners
-export function setupContentLoader() {
-    // ** Cerca #main-nav qui dentro **
-    const mainNavElement = document.getElementById('main-nav');
-    if (!mainNavElement) {
-        console.warn("Elemento #main-nav non trovato per setup listeners.");
-        return; // Esce se non trova il nav
+// Setup listeners - **ACCETTA dynamicContentAreaElement e mainNavElement COME ARGOMENTI**
+export function setupContentLoader(dynamicContentAreaElement, mainNavElement) {
+    if (!mainNavElement || !dynamicContentAreaElement) {
+        console.error("setupContentLoader: Elementi DOM necessari non forniti.");
+        return;
     }
 
     // Listener per click su nav
@@ -150,7 +133,8 @@ export function setupContentLoader() {
             const contentKey = navLink.dataset.contentKey;
             if (window.history.state?.contentKey !== contentKey) {
                 console.log(`Navigating to: ${contentKey} (click)`);
-                loadContent(contentKey);
+                // Passa gli elementi DOM a loadContent
+                loadContent(contentKey, dynamicContentAreaElement, mainNavElement);
             } else {
                  console.log(`Content key ${contentKey} già attivo.`);
                  window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -162,18 +146,23 @@ export function setupContentLoader() {
     window.addEventListener('popstate', (event) => {
         console.log("Popstate event. State:", event.state);
         const contentKey = event.state?.contentKey;
-        const defaultKey = 'mentalita-trader'; // Default key
+        const defaultKey = 'mentalita-trader';
 
+        let keyToLoad = defaultKey;
         if (contentKey && contentLibrary.hasOwnProperty(contentKey)) {
-            console.log(`Popstate: Loading: ${contentKey}`);
-            loadContent(contentKey);
+            keyToLoad = contentKey;
         } else {
             console.log("Popstate: Stato nullo o invalido, caricamento default.");
-            loadContent(defaultKey);
-            try {
-                history.replaceState({ contentKey: defaultKey }, contentLibrary[defaultKey]?.pageTitle || document.title, `#${defaultKey}`);
-            } catch(e) { console.warn("History replaceState fallito su popstate default.", e); }
+            // Aggiorna history state solo se diverso dal default per evitare loop
+            if(window.history.state?.contentKey !== defaultKey) {
+                try {
+                    history.replaceState({ contentKey: defaultKey }, contentLibrary[defaultKey]?.pageTitle || document.title, `#${defaultKey}`);
+                } catch(e) { console.warn("History replaceState fallito su popstate default.", e); }
+            }
         }
+        console.log(`Popstate: Loading: ${keyToLoad}`);
+        // Passa gli elementi DOM a loadContent
+        loadContent(keyToLoad, dynamicContentAreaElement, mainNavElement);
     });
 }
 // --- END OF FILE js/features/contentLoader.js ---
