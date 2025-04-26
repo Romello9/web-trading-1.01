@@ -13,6 +13,23 @@ header.toolbar {
 .token-icon { color: #facc15; /* Giallo token mantenuto */ margin-right: 5px; }
 #user-info { display: none; align-items: center; color: var(--light-text); font-weight: 600;}
 #username-display { margin-right: 15px; }
+/* Stili aggiuntivi per il logo nell'header della pagina contenuti */
+header.toolbar .toolbar-logo {
+    /* Assicura display flex e aggiunge gap */
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* Spazio tra immagine e testo */
+    /* Rimuovi eventuali margin specifici sull'immagine se presenti */
+}
+
+header.toolbar .toolbar-logo .logo-text {
+    color: var(--light-text); /* Usa il colore testo chiaro definito in base.css */
+    font-weight: bold;
+    font-size: 1.2rem; /* Regola la dimensione se necessario */
+    /* Potresti aggiungere un effetto leggermente diverso per la parte "Growth" se vuoi */
+    /* Esempio: .toolbar-logo .logo-text span { color: var(--accent-color); } */
+    /* Ma per ora manteniamolo semplice come testo unico */
+}
 
 nav#main-nav { /* ID specifico per coerenza */
     background-color: var(--card-bg); /* Bianco */
